@@ -4,12 +4,14 @@ import { useRoute } from "vue-router";
 import { createPinia, setActivePinia } from "pinia";
 import { useGroupUserStore } from "../stores/groupUserStore";
 import cogoToast from "cogo-toast";
+import { useAuthStore } from "../stores/authStore";
 
 setActivePinia(createPinia());
 const route = useRoute();
 const groupId = route.params.id;
 
 const groupUserStore = useGroupUserStore();
+const authStore = useAuthStore();
 
 const users = ref([]);
 const newUserId = ref("");
@@ -57,8 +59,14 @@ const fetchAllUsers = async () => {
   // filter out users who already belong to any group
   const assignedUserIds = users.value.map((u) => u.id);
 
+  // get current logged-in user id
+  const authUserId = Number(localStorage.getItem("user_id")) || Number(authStore?.user?.id);
+
   allUsers.value = all.filter(
-    (user) => !user.group_id && !assignedUserIds.includes(user.id)
+    (user) =>
+      user.id !== authUserId &&
+      !user.group_id &&
+      !assignedUserIds.includes(user.id)
   );
 };
 

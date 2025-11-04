@@ -114,7 +114,7 @@ onMounted(fetchGroups);
                   </button>
                   <button
                     @click="deleteGroup(group.id)"
-                    class="btn btn-sm btn-danger"
+                    class="btn btn-sm btn-danger me-2"
                   >
                     Delete
                   </button>

@@ -106,18 +106,24 @@ const assignTask = async () => {
 const fetchAvailableUsers = async () => {
   try {
     const all = await store.getAllUsers();
+    
+    const authUserId = Number(auth.user?.id);
 
     const groupUsers = groups.value.flatMap((g) => g.users || []);
     const groupUserIds = groupUsers.map((u) => u.id);
 
     availableUsers.value = all.filter(
-      (user) => !user.group_id && !groupUserIds.includes(user.id)
+      (user) =>
+        !user.group_id &&
+        !groupUserIds.includes(user.id) &&
+        user.id !== authUserId
     );
   } catch (error) {
     console.error("Failed to fetch available users:", error);
     availableUsers.value = [];
   }
 };
+
 
 // Delete assignment
 const removeAssignment = async (assignmentId) => {
