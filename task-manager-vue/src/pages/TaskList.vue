@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { useTaskStore } from "../stores/taskStore";
 import { useAuthStore } from "../stores/authStore";
@@ -252,6 +252,18 @@ const viewGroupInfo = (task) => {
   showGroupModal.value = true;
 };
 
+const isTaskAssigned = (task) => {
+  if (!task.assignments || !Array.isArray(task.assignments)) return false;
+
+  const hasActiveAssignment = task.assignments.some((a) =>
+    ["assigned", "progress", "hold"].includes(a.status)
+  );
+
+  const allCompleted = task.assignments.every((a) => a.status === "completed");
+
+  return hasActiveAssignment && !allCompleted;
+};
+
 // Format date
 const formatDate = (dateString) => {
   if (!dateString) return "";
@@ -463,6 +475,7 @@ window.addEventListener("storage", async (event) => {
                       <button
                         @click="deleteTask(task.id)"
                         class="btn btn-sm btn-danger me-2"
+                        :disabled="isTaskAssigned(task)"
                       >
                         Trash
                       </button>
