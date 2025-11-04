@@ -22,6 +22,9 @@ const taskAssignStore = useTaskAssignStore();
 const tasks = ref([]);
 const showTrashed = ref(false);
 
+const showGroupModal = ref(false);
+const groupInfo = ref({ name: "", members: [] });
+
 const editingTaskId = ref(null);
 const editedTask = ref({ title: "", description: "" });
 
@@ -112,8 +115,8 @@ const getVisibleStatus = (task) => {
     (a) => a.assignee_user && Number(a.assignee_user.id) === userId
   );
 
-  const groupAssignment = task.assignments.find(
-    (a) => a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+  const groupAssignment = task.assignments.find((a) =>
+    a.assignee_group?.users?.some((u) => Number(u.id) === userId)
   );
 
   if (authStore.isAdmin) {
@@ -134,15 +137,15 @@ const getAdminCompletedAssignments = (task) => {
 
   task.assignments.forEach((a) => {
     if (a.status === "completed") {
-      if (a.assignee_user) completed.push(`Completed by ${a.assignee_user.name}`);
-      else if (a.assignee_group) completed.push(`Completed by ${a.assignee_group.name}`);
+      if (a.assignee_user)
+        completed.push(`Completed by ${a.assignee_user.name}`);
+      else if (a.assignee_group)
+        completed.push(`Completed by ${a.assignee_group.name}`);
     }
   });
 
   return completed;
 };
-
-
 
 const getUserAssignment = (task) => {
   const userId = Number(authStore.user?.id);
@@ -152,15 +155,20 @@ const getUserAssignment = (task) => {
     (a) => a.assignee_user && Number(a.assignee_user.id) === userId
   );
   if (userAssignment) {
-    return { updated_at: userAssignment.updated_at, status: userAssignment.status };
+    return {
+      updated_at: userAssignment.updated_at,
+      status: userAssignment.status,
+    };
   }
 
-  const groupAssignment = task.assignments.find(
-    (a) =>
-      a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+  const groupAssignment = task.assignments.find((a) =>
+    a.assignee_group?.users?.some((u) => Number(u.id) === userId)
   );
   if (groupAssignment) {
-    return { updated_at: groupAssignment.updated_at, status: groupAssignment.status };
+    return {
+      updated_at: groupAssignment.updated_at,
+      status: groupAssignment.status,
+    };
   }
 
   return null;
@@ -179,7 +187,7 @@ const updateUserStatus = async (task, newStatus) => {
 
   if (!assignment) return;
 
-  if (newStatus === 'created') return;
+  if (newStatus === "created") return;
 
   const updated = await taskAssignStore.updateAssignmentStatus(
     task.id,
@@ -203,6 +211,29 @@ const updateUserStatus = async (task, newStatus) => {
   }
 };
 
+const viewGroupInfo = (task) => {
+  const userId = Number(authStore.user?.id);
+
+  const groupAssignment = task.assignments.find((a) =>
+    a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+  );
+
+  if (!groupAssignment) {
+    Swal.fire({
+      icon: "info",
+      title: "No Group Found",
+      text: "You are not assigned to any group for this task.",
+    });
+    return;
+  }
+
+  groupInfo.value = {
+    name: groupAssignment.assignee_group?.name || "Unnamed Group",
+    members: groupAssignment.assignee_group?.users || [],
+  };
+
+  showGroupModal.value = true;
+};
 
 // Format date
 const formatDate = (dateString) => {
@@ -292,21 +323,38 @@ window.addEventListener("storage", async (event) => {
               <td class="text-center align-middle">
                 <!-- Status badge -->
                 <span
-                v-if="!authStore.isAdmin || getAdminCompletedAssignments(task).length === 0"
+                  v-if="
+                    !authStore.isAdmin ||
+                    getAdminCompletedAssignments(task).length === 0
+                  "
                   class="badge"
                   :class="{
                     'bg-secondary': getVisibleStatus(task) === 'created',
                     'bg-info': getVisibleStatus(task) === 'assigned',
                     'bg-primary': getVisibleStatus(task) === 'progress',
                     'bg-warning text-dark': getVisibleStatus(task) === 'hold',
-                    'bg-success': getVisibleStatus(task) === 'completed' || (authStore.isAdmin && getAdminCompletedAssignments(task).length),
+                    'bg-success':
+                      getVisibleStatus(task) === 'completed' ||
+                      (authStore.isAdmin &&
+                        getAdminCompletedAssignments(task).length),
                     'bg-danger': getVisibleStatus(task) === 'cancelled',
                   }"
                 >
-                {{ !authStore.isAdmin ? formatStatus(getVisibleStatus(task)) : (getAdminCompletedAssignments(task).length ? "Completed" : formatStatus(getVisibleStatus(task))) }}
+                  {{
+                    !authStore.isAdmin
+                      ? formatStatus(getVisibleStatus(task))
+                      : getAdminCompletedAssignments(task).length
+                      ? "Completed"
+                      : formatStatus(getVisibleStatus(task))
+                  }}
                 </span>
 
-                <template v-if="authStore.isAdmin && getAdminCompletedAssignments(task).length">
+                <template
+                  v-if="
+                    authStore.isAdmin &&
+                    getAdminCompletedAssignments(task).length
+                  "
+                >
                   <span
                     v-for="(text, index) in getAdminCompletedAssignments(task)"
                     :key="index"
@@ -315,10 +363,14 @@ window.addEventListener("storage", async (event) => {
                     {{ text }}
                   </span>
                 </template>
-                
+
                 <div v-if="!authStore.isAdmin">
                   <select
-                    v-if="getVisibleStatus(task) !== 'completed' && getVisibleStatus(task) !== 'created' && getVisibleStatus(task) !== 'cancelled'"
+                    v-if="
+                      getVisibleStatus(task) !== 'completed' &&
+                      getVisibleStatus(task) !== 'created' &&
+                      getVisibleStatus(task) !== 'cancelled'
+                    "
                     class="form-select form-select-sm mt-2"
                     :value="getVisibleStatus(task)"
                     @change="updateUserStatus(task, $event.target.value)"
@@ -331,13 +383,16 @@ window.addEventListener("storage", async (event) => {
               </td>
 
               <td v-if="!authStore.isAdmin">
-                  <span
-                    v-if="getUserAssignment(task) && getVisibleStatus(task) !== 'created'"
-                  >
-                    <small class="text-muted">
-                      {{ formatDate(getUserAssignment(task).updated_at) }}
-                    </small>
-                  </span>
+                <span
+                  v-if="
+                    getUserAssignment(task) &&
+                    getVisibleStatus(task) !== 'created'
+                  "
+                >
+                  <small class="text-muted">
+                    {{ formatDate(getUserAssignment(task).updated_at) }}
+                  </small>
+                </span>
               </td>
 
               <td class="text-center align-middle">
@@ -345,12 +400,12 @@ window.addEventListener("storage", async (event) => {
                 <template v-if="!showTrashed">
                   <!-- Normal user: Only see Assign button -->
                   <div v-if="!authStore.isAdmin">
-                    <RouterLink
-                      :to="{ name: 'task-assign', params: { id: task.id } }"
+                    <button
                       class="btn btn-sm btn-info"
+                      @click="viewGroupInfo(task)"
                     >
-                      View / Assign
-                    </RouterLink>
+                      Group Info
+                    </button>
                   </div>
 
                   <!-- Admin: Full control -->
@@ -423,6 +478,51 @@ window.addEventListener("storage", async (event) => {
             </tr>
           </tbody>
         </table>
+        <!-- 🔹 Group Info Modal -->
+        <div
+          class="modal fade show"
+          v-if="showGroupModal"
+          tabindex="-1"
+          style="align-items: center; justify-content: center; display: block; background: rgba(0, 0, 0, 0.5)"
+        >
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Group Information</h5>
+                <button
+                  type="button"
+                  class="btn-close"
+                  @click="showGroupModal = false"
+                ></button>
+              </div>
+
+              <div class="modal-body">
+                <p><strong>Group Name:</strong> {{ groupInfo.name }}</p>
+                <hr />
+                <p><strong>Members:</strong></p>
+                <ul class="list-group">
+                  <li
+                    v-for="(member, index) in groupInfo.members"
+                    :key="index"
+                    class="list-group-item"
+                  >
+                    {{ member.name }}
+                  </li>
+                </ul>
+              </div>
+
+              <div class="modal-footer">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  @click="showGroupModal = false"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -438,5 +538,14 @@ select:disabled {
   background-color: #eee;
   cursor: not-allowed;
   opacity: 0.7;
+}
+.modal {
+  z-index: 9999;
+}
+.modal-content {
+  border-radius: 12px;
+}
+.list-group-item {
+  font-size: 0.95rem;
 }
 </style>
