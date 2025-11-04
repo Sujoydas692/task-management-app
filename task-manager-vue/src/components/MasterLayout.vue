@@ -64,6 +64,12 @@ onMounted(() => {
       <i class="bi bi-speedometer2 side-bar-item-icon"></i>
       <span>Dashboard</span>
     </RouterLink>
+    <div v-if="authStore.isAdmin">
+    <RouterLink :to="{ name: 'users' }" class="side-bar-item mt-2" active-class="active-link">
+      <i class="bi bi-speedometer2 side-bar-item-icon"></i>
+      <span>Users</span>
+    </RouterLink>
+    </div>
     <RouterLink :to="{ name: 'tasks' }" class="side-bar-item mt-2" active-class="active-link">
       <i class="bi bi-pencil-square side-bar-item-icon"></i>
       <span>Tasks</span>

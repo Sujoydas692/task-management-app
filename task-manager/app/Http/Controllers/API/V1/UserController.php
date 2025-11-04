@@ -57,7 +57,7 @@ class UserController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $users = User::select('id', 'name', 'email', 'type')
+            $users = User::select('id', 'name', 'email', 'type', 'profile_image')
                 ->with(['groups:id'])
                 ->get()
                 ->map(function ($user) {
@@ -65,7 +65,7 @@ class UserController extends Controller
                     unset($user->groups);
                     return $user;
                 });
-            return $this->success($users, 'All Users');
+            return $this->success(UserResource::collection($users), 'All Users');
         } catch (\Exception $e) {
             Log::error('User List Error: ' . $e->getMessage());
             return $this->error();

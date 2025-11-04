@@ -102,6 +102,16 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
+  const getAllUsers = async () => {
+    try {
+      const res = await apiClient.get("/auth/users");
+      return res.data.data || [];
+    } catch (error) {
+      cogoToast.error("Failed to load all users", { position: "top-right" });
+      return [];
+    }
+  };
+
   const updateProfile = async (formData) => {
       try {
         const res = await apiClient.post('/auth/user?_method=PUT', formData, {
@@ -130,5 +140,6 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     getProfile,
     updateProfile,
+    getAllUsers,
   };
 });

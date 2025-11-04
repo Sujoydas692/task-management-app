@@ -12,6 +12,7 @@ import TaskAssign from "./pages/TaskAssign.vue";
 import GroupUser from "./pages/GroupUser.vue";
 import { useAuthStore } from "./stores/authStore";
 import cogoToast from "cogo-toast";
+import UserList from "./pages/UserList.vue";
 
 const routes = [
   {
@@ -39,6 +40,11 @@ const routes = [
         path: "/dashboard",
         component: DashboardPage,
         name: "dashboard",
+      },
+      {
+        path: "/users",
+        component: UserList,
+        name: "users",
       },
       {
         path: "/profile",
