@@ -124,6 +124,15 @@ const getVisibleStatus = (task) => {
   );
 
   if (authStore.isAdmin) {
+    const hasCompleted = task.assignments.some((a) => a.status === "completed");
+    const hasAssigned = task.assignments.some(
+      (a) =>
+        a.status === "assigned" ||
+        a.status === "progress" ||
+        a.status === "hold"
+    );
+    if (hasCompleted) return "completed";
+    if (hasAssigned) return "assigned";
     return task.status || "created";
   }
 
@@ -138,18 +147,21 @@ const getVisibleStatus = (task) => {
 const getAdminCompletedAssignments = (task) => {
   if (!authStore.isAdmin) return [];
   if (!task.assignments || !Array.isArray(task.assignments)) return [];
-  const completed = [];
+  const result = [];
 
   task.assignments.forEach((a) => {
     if (a.status === "completed") {
-      if (a.assignee_user)
-        completed.push(`Completed by ${a.assignee_user.name}`);
+      if (a.assignee_user) result.push(`Completed by ${a.assignee_user.name}`);
       else if (a.assignee_group)
-        completed.push(`Completed by ${a.assignee_group.name}`);
+        result.push(`Completed by ${a.assignee_group.name}`);
+    } else if (["assigned", "progress", "hold"].includes(a.status)) {
+      if (a.assignee_user) result.push(` Assigned to ${a.assignee_user.name}`);
+      else if (a.assignee_group)
+        result.push(` Assigned to ${a.assignee_group.name}`);
     }
   });
 
-  return completed;
+  return result;
 };
 
 const getUserAssignment = (task) => {
@@ -277,7 +289,7 @@ window.addEventListener("storage", async (event) => {
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h4>{{ showTrashed ? "Trashed Tasks" : "Task List" }}</h4>
 
-          <!-- 🔹 Only Admin can see Add / Toggle Trash buttons -->
+          <!-- Only Admin can see Add / Toggle Trash buttons -->
           <div v-if="authStore.isAdmin">
             <button @click="toggleView" class="btn btn-sm btn-secondary me-2">
               {{ showTrashed ? "Show Active" : "Show Trash" }}
@@ -360,13 +372,21 @@ window.addEventListener("storage", async (event) => {
                     getAdminCompletedAssignments(task).length
                   "
                 >
-                  <span
-                    v-for="(text, index) in getAdminCompletedAssignments(task)"
-                    :key="index"
-                    class="badge bg-success"
-                  >
-                    {{ text }}
-                  </span>
+                  <div class="d-flex flex-column gap-1 mt-2">
+                    <span
+                      v-for="(text, index) in getAdminCompletedAssignments(
+                        task
+                      )"
+                      :key="index"
+                      class="badge"
+                      :class="{
+                        'bg-success': text.includes('Completed by'),
+                        'bg-info': text.includes('Assigned to'),
+                      }"
+                    >
+                      {{ text }}
+                    </span>
+                  </div>
                 </template>
 
                 <div v-if="!authStore.isAdmin">
@@ -488,7 +508,12 @@ window.addEventListener("storage", async (event) => {
           class="modal fade show"
           v-if="showGroupModal"
           tabindex="-1"
-          style="align-items: center; justify-content: center; display: block; background: rgba(0, 0, 0, 0.5)"
+          style="
+            align-items: center;
+            justify-content: center;
+            display: block;
+            background: rgba(0, 0, 0, 0.5);
+          "
         >
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
