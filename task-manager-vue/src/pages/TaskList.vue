@@ -100,30 +100,10 @@ const forceDeleteTask = async (taskId) => {
   }
 };
 
-// const updateStatus = async (taskId, newStatus, task) => {
-//   const updatedTask = await taskStore.updateTaskStatus(taskId, newStatus, task);
-//   if (updatedTask) {
-//     const index = tasks.value.findIndex((t) => t.id === taskId);
-//     if (index !== -1) tasks.value[index].status = updatedTask.status;
-//   }
-// };
-
 const formatStatus = (status) => {
   if (!status) return "Unknown";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
-
-// // --- Helpers ---
-// const isUserAssigned = (task) => {
-//   const userId = authStore.user?.id;
-//   return task.assigned_users?.some((u) => Number(u.id) === Number(userId));
-// };
-
-// const canChangeStatus = (task) => {
-//   if (authStore.isAdmin) return true;
-//   if (task.status === "completed") return false;
-//   return isUserAssigned(task);
-// };
 
 const getVisibleStatus = (task) => {
   const userId = Number(authStore.user?.id);
