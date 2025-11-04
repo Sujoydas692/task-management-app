@@ -111,6 +111,10 @@ const formatStatus = (status) => {
 const getVisibleStatus = (task) => {
   const userId = Number(authStore.user?.id);
 
+  if (!task.assignments || !Array.isArray(task.assignments)) {
+    return task.status || "created";
+  }
+
   const userAssignment = task.assignments.find(
     (a) => a.assignee_user && Number(a.assignee_user.id) === userId
   );
@@ -133,6 +137,7 @@ const getVisibleStatus = (task) => {
 // Admin completed assignments list
 const getAdminCompletedAssignments = (task) => {
   if (!authStore.isAdmin) return [];
+  if (!task.assignments || !Array.isArray(task.assignments)) return [];
   const completed = [];
 
   task.assignments.forEach((a) => {
