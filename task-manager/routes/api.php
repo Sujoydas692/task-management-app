@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\API\V1\Auth\AuthController;
 use App\Http\Controllers\API\V1\Auth\ForgotPasswordController;
+use App\Http\Controllers\API\V1\DashboardController;
 use App\Http\Controllers\API\V1\GroupController;
 use App\Http\Controllers\API\V1\GroupUserController;
 use App\Http\Controllers\API\V1\TaskAssignController;
@@ -31,6 +32,14 @@ Route::group(['prefix' => 'v1'], function () {
 
             Route::get('users', [UserController::class, 'index']);
         });
+    });
+
+    // Dashboard route
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/admin/dashboard-data', [DashboardController::class, 'adminData'])
+            ->middleware('Admin');
+
+        Route::get('/user/dashboard-data', [DashboardController::class, 'userData']);
     });
 
     // Group resource route
