@@ -17,10 +17,17 @@ const fileInput = ref(null);
 
 const fetchProfile = async () => {
   const data = await authStore.getProfile()
-  if (data) user.value = data
+  if (data) {
+    user.value = data
+    localStorage.setItem("user", JSON.stringify(user.value));
+  } 
 }
 
 onMounted(() => {
+  const cached = localStorage.getItem("user");
+  if (cached) {
+    user.value = JSON.parse(cached);
+  }
   fetchProfile();
 });
 

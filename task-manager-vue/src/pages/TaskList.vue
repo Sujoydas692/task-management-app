@@ -31,8 +31,10 @@ const editedTask = ref({ title: "", description: "" });
 const fetchTasks = async () => {
   if (showTrashed.value) {
     tasks.value = await taskStore.getTrashedTasks();
+    localStorage.setItem("tasks", JSON.stringify(tasks.value));
   } else {
     tasks.value = await taskStore.getTasks();
+    localStorage.setItem("tasks", JSON.stringify(tasks.value));
   }
 };
 
@@ -271,6 +273,10 @@ const formatDate = (dateString) => {
 };
 
 onMounted(async () => {
+  const cached = localStorage.getItem("tasks");
+  if (cached) {
+    tasks.value = JSON.parse(cached);
+  }
   await fetchTasks();
 });
 

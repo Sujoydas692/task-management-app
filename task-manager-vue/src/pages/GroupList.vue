@@ -20,6 +20,7 @@ const editedGroup = ref({ name: "" });
 
 const fetchGroups = async () => {
   groups.value = await groupStore.getGroups();
+  localStorage.setItem("groups", JSON.stringify(groups.value));
 };
 
 // Custom format function
@@ -52,7 +53,14 @@ const deleteGroup = async (groupId) => {
   }
 };
 
-onMounted(fetchGroups);
+onMounted(async () => {
+  const cached = localStorage.getItem("groups");
+  if (cached) {
+    groups.value = JSON.parse(cached);
+  }
+
+  await fetchGroups();
+});
 </script>
 
 <template>

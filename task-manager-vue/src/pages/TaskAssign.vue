@@ -30,6 +30,23 @@ const isAssignDisabled = ref(true);
 
 const availableUsers = ref([]);
 
+const cacheSet = (key, value, ttl = 600000) => {
+  localStorage.setItem(
+    key,
+    JSON.stringify({ value, expire: Date.now() + ttl })
+  );
+};
+const cacheGet = (key) => {
+  const item = localStorage.getItem(key);
+  if (!item) return null;
+  const parsed = JSON.parse(item);
+  if (Date.now() > parsed.expire) {
+    localStorage.removeItem(key);
+    return null;
+  }
+  return parsed.value;
+};
+
 onMounted(async () => {
   const taskId = route.params.id || route.params.taskId;
   if (!taskId) {
@@ -39,7 +56,13 @@ onMounted(async () => {
   selectedTask.value = taskId;
   const res = await apiClient.get(`/tasks/${taskId}`);
   taskName.value = res.data.data.title;
-  groups.value = await store.getGroups();
+  const cachedGroups = cacheGet("groups_cache");
+  if (cachedGroups) {
+    groups.value = cachedGroups;
+  } else {
+    groups.value = await store.getGroups();
+    cacheSet("groups_cache", groups.value);
+  }
   await loadAssignments();
   await fetchAvailableUsers();
 });
@@ -59,10 +82,14 @@ const loadGroupUsers = async () => {
 };
 
 const loadAssignments = async () => {
-  if (selectedTask.value) {
-    assignments.value = await store.getAssignments(selectedTask.value);
+   if (!selectedTask.value) return;
+  const cacheKey = `assignments_${selectedTask.value}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    assignments.value = cached;
   } else {
-    console.warn("No task ID found when loading assignments!");
+    assignments.value = await store.getAssignments(selectedTask.value);
+    cacheSet(cacheKey, assignments.value, 120000);
   }
 };
 
@@ -97,6 +124,7 @@ const assignTask = async () => {
 
   const success = await store.assignTask(selectedTask.value, payload);
   if (success) {
+    localStorage.removeItem(`assignments_${selectedTask.value}`);
     await loadAssignments();
     await fetchAvailableUsers();
     selectedUser.value = "";
@@ -108,10 +136,11 @@ const assignTask = async () => {
 
 const fetchAvailableUsers = async () => {
   try {
-    const all = await store.getAllUsers();
+    const cachedUsers = cacheGet("all_users_cache");
+    const all = cachedUsers || (await store.getAllUsers());
+    if (!cachedUsers) cacheSet("all_users_cache", all);
 
     const authUserId = Number(auth.user?.id);
-
     const groupUsers = groups.value.flatMap((g) => g.users || []);
     const groupUserIds = groupUsers.map((u) => u.id);
 
@@ -145,6 +174,7 @@ const removeAssignment = async (assignmentId) => {
       assignmentId
     );
     if (success) {
+      localStorage.removeItem(`assignments_${selectedTask.value}`);
       await loadAssignments();
     }
   }
@@ -162,6 +192,7 @@ const changeTaskStatus = async (assignment) => {
     if (index !== -1) {
       assignments.value[index].status = assignment.status;
     }
+    localStorage.removeItem(`assignments_${selectedTask.value}`);
     if (!auth.isAdmin) {
       localStorage.setItem(
         "task_status_sync",
