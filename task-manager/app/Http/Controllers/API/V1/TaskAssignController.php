@@ -147,7 +147,7 @@ class TaskAssignController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'User updated assignment status successfully',
-                'data' => $assignment->fresh(),
+                'data' => $assignment->fresh()
             ]);
         }
     }
