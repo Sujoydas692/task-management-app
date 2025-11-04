@@ -516,7 +516,7 @@ window.addEventListener("storage", async (event) => {
             </tr>
           </tbody>
         </table>
-        <!-- 🔹 Group Info Modal -->
+        <!-- Group Info Modal -->
         <div
           class="modal fade show"
           v-if="showGroupModal"
@@ -543,15 +543,15 @@ window.addEventListener("storage", async (event) => {
                 <p><strong>Group Name:</strong> {{ groupInfo.name }}</p>
                 <hr />
                 <p><strong>Members:</strong></p>
-                <ul class="list-group">
-                  <li
+                <div>
+                  <span
                     v-for="(member, index) in groupInfo.members"
                     :key="index"
-                    class="list-group-item"
+                    class="badge bg-primary me-1 mb-1"
                   >
                     {{ member.name }}
-                  </li>
-                </ul>
+                  </span>
+                </div>
               </div>
 
               <div class="modal-footer">
