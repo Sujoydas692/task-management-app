@@ -64,7 +64,7 @@ class TaskController extends Controller
                 'created_by' => $request->user()->id,
                 'title' => $request->title,
                 'description' => $request->description,
-                'status' => $request->status ?? 'created',
+                'status' => 'created',
             ]);
             return $this->success($task, 'Task Create Success');
         } catch (\Exception $e) {
@@ -127,22 +127,22 @@ class TaskController extends Controller
         }
     }
 
-    public function updateStatus(Request $request, Task $task): JsonResponse
-    {
-        try {
-            $validated = $request->validate([
-                'status' => 'required|in:created,assigned,progress,hold,completed,cancelled',
-            ]);
-
-            $task->status = $validated['status'];
-            $task->save();
-
-            return $this->success($task, 'Task Status Updated Successfully');
-        } catch (\Exception $e) {
-            Log::error('Task Status Update Error: ' . $e->getMessage());
-            return $this->error();
-        }
-    }
+//    public function updateStatus(Request $request, Task $task): JsonResponse
+//    {
+//        try {
+//            $validated = $request->validate([
+//                'status' => 'required|in:created,assigned,progress,hold,completed,cancelled',
+//            ]);
+//
+//            $task->status = $validated['status'];
+//            $task->save();
+//
+//            return $this->success($task, 'Task Status Updated Successfully');
+//        } catch (\Exception $e) {
+//            Log::error('Task Status Update Error: ' . $e->getMessage());
+//            return $this->error();
+//        }
+//    }
 
     public function trashed(Request $request): JsonResponse
     {

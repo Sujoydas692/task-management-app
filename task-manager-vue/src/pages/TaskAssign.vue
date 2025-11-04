@@ -1,23 +1,19 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import { useRoute } from "vue-router";
 import { createPinia, setActivePinia } from "pinia";
 import { useTaskAssignStore } from "../stores/taskAssignStore";
+import { useAuthStore } from "../stores/authStore";
 import apiClient from "../services/axiosClient";
 import cogoToast from "cogo-toast";
-import dayjs from "dayjs";
-import weekday from "dayjs/plugin/weekday";
-import localizedFormat from "dayjs/plugin/localizedFormat";
-import utc from "dayjs/plugin/utc";
 import Swal from "sweetalert2";
-
-dayjs.extend(weekday);
-dayjs.extend(localizedFormat);
-dayjs.extend(utc);
 
 setActivePinia(createPinia());
 const store = useTaskAssignStore();
+const auth = useAuthStore();
 const route = useRoute();
+
+const isAdmin = computed(() => auth.user && auth.user.type === "Admin");
 
 const tasks = ref([]);
 const groups = ref([]);
@@ -33,13 +29,23 @@ const selectedAvailableUser = ref("");
 const availableUsers = ref([]);
 
 onMounted(async () => {
-  const taskId = route.params.id;
+  const taskId = route.params.id || route.params.taskId;
+  if (!taskId) {
+    cogoToast.error("Invalid Task ID!", { position: "top-right" });
+    return;
+  }
   selectedTask.value = taskId;
   const res = await apiClient.get(`/tasks/${taskId}`);
   taskName.value = res.data.data.title;
   groups.value = await store.getGroups();
   await loadAssignments();
   await fetchAvailableUsers();
+});
+
+window.addEventListener("storage", async (e) => {
+  if (e.key === "task_status_updated") {
+    await loadAssignments();
+  }
 });
 
 const loadGroupUsers = async () => {
@@ -50,14 +56,11 @@ const loadGroupUsers = async () => {
   }
 };
 
-// Custom format function
-const formatDate = (dateString) => {
-  return dayjs.utc(dateString).local().format("dddd, DD MMMM, hh:mm A");
-};
-
 const loadAssignments = async () => {
   if (selectedTask.value) {
     assignments.value = await store.getAssignments(selectedTask.value);
+  } else {
+    console.warn("No task ID found when loading assignments!");
   }
 };
 
@@ -129,9 +132,38 @@ const removeAssignment = async (assignmentId) => {
   });
 
   if (result.isConfirmed) {
-    const success = await store.deleteAssignment(selectedTask.value, assignmentId);
+    const success = await store.deleteAssignment(
+      selectedTask.value,
+      assignmentId
+    );
     if (success) {
       await loadAssignments();
+    }
+  }
+};
+
+const changeTaskStatus = async (assignment) => {
+  const response = await store.updateTaskStatusViaAssignment(
+    assignment.task_id,
+    assignment.id,
+    assignment.status
+  );
+
+  if (response) {
+    const index = assignments.value.findIndex((a) => a.id === assignment.id);
+    if (index !== -1) {
+      assignments.value[index].status = assignment.status;
+    }
+    if (!auth.isAdmin) {
+      localStorage.setItem(
+        "task_status_sync",
+        JSON.stringify({
+          taskId: assignment.task_id,
+          status: assignment.status,
+          updatedBy: "User",
+          time: Date.now(),
+        })
+      );
     }
   }
 };
@@ -192,7 +224,11 @@ watch(selectedGroup, () => {
             <label class="form-label">Available User (No Group)</label>
             <select v-model="selectedAvailableUser" class="form-select">
               <option value="">-- Select Available User --</option>
-              <option v-for="user in availableUsers" :key="user.id" :value="user.id">
+              <option
+                v-for="user in availableUsers"
+                :key="user.id"
+                :value="user.id"
+              >
                 {{ user.name }} ({{ user.email }})
               </option>
             </select>
@@ -219,7 +255,7 @@ watch(selectedGroup, () => {
               <th>Assignee Type</th>
               <th>Assignee Name</th>
               <th>Assigned By</th>
-              <th>Assigned Time</th>
+              <th>Task Status</th>
               <th></th>
             </tr>
           </thead>
@@ -229,8 +265,49 @@ watch(selectedGroup, () => {
               <td>{{ a.assignee_name }}</td>
               <td>{{ a.assigned_by?.name }}</td>
               <td>
-                {{ formatDate(a.assigned_at) }}
+                <!-- Admin view -->
+                <template v-if="isAdmin">
+                  <select
+                    v-model="a.status"
+                    @change="changeTaskStatus(a)"
+                    class="form-select form-select-sm"
+                    :class="{
+                      'border-success': a.status === 'completed',
+                      'border-warning': a.status === 'hold',
+                      'border-danger': a.status === 'cancelled',
+                    }"
+                  >
+                    <option value="created">Created</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="progress">In Progress</option>
+                    <option value="hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </template>
+
+                <!-- User view -->
+                <template v-else>
+                  <select
+                    v-if="a.status !== 'completed'"
+                    v-model="a.status"
+                    @change="changeTaskStatus(a)"
+                    class="form-select form-select-sm"
+                  >
+                    <option value="progress">In Progress</option>
+                    <option value="hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                  </select>
+
+                  <span
+                    v-else
+                    class="text-green-600 font-semibold flex items-center gap-1"
+                  >
+                    ✅ Completed
+                  </span>
+                </template>
               </td>
+
               <td>
                 <button
                   @click="removeAssignment(a.id)"

@@ -67,6 +67,40 @@ export const useTaskAssignStore = defineStore("taskAssign", () => {
     }
   };
 
+  const updateTaskStatusViaAssignment = async (taskId, assignmentId, status) => {
+  try {
+    const response = await apiClient.patch(
+      `/tasks/${taskId}/assignments/${assignmentId}/update-task-status`,
+      { status }
+    );
+    cogoToast.success("Task status updated successfully!", { position: "top-right" });
+    return response.data.data;
+  } catch (error) {
+    cogoToast.error("Failed to update task status", { position: "top-right" });
+    return null;
+  }
+};
+
+const updateAssignmentStatus = async (taskId, assignmentId, status) => {
+    try {
+      const { data } = await apiClient.patch(
+        `/tasks/${taskId}/assignments/${assignmentId}/update-task-status`,
+        { status }
+      );
+      cogoToast.success("Assignment status updated!", {
+        position: "top-right",
+      });
+      return data.data;
+    } catch (error) {
+      cogoToast.error("Failed to update assignment status", {
+        position: "top-right",
+      });
+      return null;
+    }
+  };
+
+
+
   return {
     getGroups,
     getGroupUsers,
@@ -74,5 +108,7 @@ export const useTaskAssignStore = defineStore("taskAssign", () => {
     getAssignments,
     deleteAssignment,
     getAllUsers,
+    updateTaskStatusViaAssignment,
+    updateAssignmentStatus,
   };
 });

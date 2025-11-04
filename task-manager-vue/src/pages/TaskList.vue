@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import utc from "dayjs/plugin/utc";
+import { useTaskAssignStore } from "../stores/taskAssignStore";
 
 dayjs.extend(weekday);
 dayjs.extend(localizedFormat);
@@ -16,6 +17,7 @@ dayjs.extend(utc);
 setActivePinia(createPinia());
 const taskStore = useTaskStore();
 const authStore = useAuthStore();
+const taskAssignStore = useTaskAssignStore();
 
 const tasks = ref([]);
 const showTrashed = ref(false);
@@ -98,44 +100,158 @@ const forceDeleteTask = async (taskId) => {
   }
 };
 
-const updateStatus = async (taskId, newStatus, task) => {
-  const updatedTask = await taskStore.updateTaskStatus(taskId, newStatus, task);
-  if (updatedTask) {
-    const index = tasks.value.findIndex((t) => t.id === taskId);
-    if (index !== -1) tasks.value[index].status = updatedTask.status;
-  }
-};
+// const updateStatus = async (taskId, newStatus, task) => {
+//   const updatedTask = await taskStore.updateTaskStatus(taskId, newStatus, task);
+//   if (updatedTask) {
+//     const index = tasks.value.findIndex((t) => t.id === taskId);
+//     if (index !== -1) tasks.value[index].status = updatedTask.status;
+//   }
+// };
 
 const formatStatus = (status) => {
   if (!status) return "Unknown";
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
-// --- Helpers ---
-const isUserAssigned = (task) => {
-  const userId = authStore.user?.id;
-  return task.assigned_users?.some((u) => Number(u.id) === Number(userId));
+// // --- Helpers ---
+// const isUserAssigned = (task) => {
+//   const userId = authStore.user?.id;
+//   return task.assigned_users?.some((u) => Number(u.id) === Number(userId));
+// };
+
+// const canChangeStatus = (task) => {
+//   if (authStore.isAdmin) return true;
+//   if (task.status === "completed") return false;
+//   return isUserAssigned(task);
+// };
+
+const getVisibleStatus = (task) => {
+  const userId = Number(authStore.user?.id);
+
+  const userAssignment = task.assignments.find(
+    (a) => a.assignee_user && Number(a.assignee_user.id) === userId
+  );
+
+  const groupAssignment = task.assignments.find(
+    (a) => a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+  );
+
+  if (authStore.isAdmin) {
+    return task.status || "created";
+  }
+
+  // Normal user
+  if (userAssignment) return userAssignment.status;
+  if (groupAssignment) return groupAssignment.status;
+
+  return task.status || "created";
 };
 
-const canChangeStatus = (task) => {
-  if (authStore.isAdmin) return true;
-  if (task.status === "completed") return false;
-  return isUserAssigned(task);
+// Admin completed assignments list
+const getAdminCompletedAssignments = (task) => {
+  if (!authStore.isAdmin) return [];
+  const completed = [];
+
+  task.assignments.forEach((a) => {
+    if (a.status === "completed") {
+      if (a.assignee_user) completed.push(`Completed by ${a.assignee_user.name}`);
+      else if (a.assignee_group) completed.push(`Completed by ${a.assignee_group.name}`);
+    }
+  });
+
+  return completed;
 };
 
+
+
+const getUserAssignment = (task) => {
+  const userId = Number(authStore.user?.id);
+  if (!task.assignments?.length) return null;
+
+  const userAssignment = task.assignments.find(
+    (a) => a.assignee_user && Number(a.assignee_user.id) === userId
+  );
+  if (userAssignment) {
+    return { updated_at: userAssignment.updated_at, status: userAssignment.status };
+  }
+
+  const groupAssignment = task.assignments.find(
+    (a) =>
+      a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+  );
+  if (groupAssignment) {
+    return { updated_at: groupAssignment.updated_at, status: groupAssignment.status };
+  }
+
+  return null;
+};
+
+const updateUserStatus = async (task, newStatus) => {
+  const userId = Number(authStore.user?.id);
+
+  const assignment =
+    task.assignments.find(
+      (a) => a.assignee_user && Number(a.assignee_user.id) === userId
+    ) ||
+    task.assignments.find((a) =>
+      a.assignee_group?.users?.some((u) => Number(u.id) === userId)
+    );
+
+  if (!assignment) return;
+
+  if (newStatus === 'created') return;
+
+  const updated = await taskAssignStore.updateAssignmentStatus(
+    task.id,
+    assignment.id,
+    newStatus
+  );
+
+  if (updated) {
+    assignment.status = updated.status;
+    assignment.updated_at = new Date().toISOString();
+
+    localStorage.setItem(
+      "task_status_sync",
+      JSON.stringify({
+        taskId: task.id,
+        status: updated.status,
+        updated_at: assignment.updated_at,
+        updatedBy: "user",
+      })
+    );
+  }
+};
+
+
+// Format date
 const formatDate = (dateString) => {
+  if (!dateString) return "";
   return dayjs.utc(dateString).local().format("dddd, DD MMMM, hh:mm A");
 };
 
-const getUserAssignment = (task) => {
-  const userId = authStore.user?.id;
-  if (!task.assigned_users) return null;
-  return task.assigned_users.find(
-    (a) => a.assignee_user && Number(a.assignee_user.id) === Number(userId)
-  );
-};
+onMounted(async () => {
+  await fetchTasks();
+});
 
-onMounted(fetchTasks);
+window.addEventListener("storage", async (event) => {
+  if (event.key === "task_status_sync") {
+    try {
+      const data = JSON.parse(event.newValue);
+
+      if (data?.updatedBy === "user" && data?.taskId && data?.status) {
+        const taskIndex = tasks.value.findIndex(
+          (t) => Number(t.id) === Number(data.taskId)
+        );
+        if (taskIndex !== -1) {
+          tasks.value[taskIndex].status = data.status;
+        }
+      }
+    } catch (e) {
+      console.error("Task status sync error:", e);
+    }
+  }
+});
 </script>
 
 <template>
@@ -167,7 +283,7 @@ onMounted(fetchTasks);
               <th>Description</th>
               <th>Created By</th>
               <th>Status</th>
-              <th v-if="!authStore.isAdmin">Assigned At</th>
+              <th v-if="!authStore.isAdmin">Status Updated Time</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -196,56 +312,52 @@ onMounted(fetchTasks);
               <td class="text-center align-middle">
                 <!-- Status badge -->
                 <span
+                v-if="!authStore.isAdmin || getAdminCompletedAssignments(task).length === 0"
                   class="badge"
                   :class="{
-                    'bg-secondary': task.status === 'created',
-                    'bg-info': task.status === 'assigned',
-                    'bg-primary': task.status === 'progress',
-                    'bg-warning text-dark': task.status === 'hold',
-                    'bg-success': task.status === 'completed',
-                    'bg-danger': task.status === 'cancelled',
+                    'bg-secondary': getVisibleStatus(task) === 'created',
+                    'bg-info': getVisibleStatus(task) === 'assigned',
+                    'bg-primary': getVisibleStatus(task) === 'progress',
+                    'bg-warning text-dark': getVisibleStatus(task) === 'hold',
+                    'bg-success': getVisibleStatus(task) === 'completed' || (authStore.isAdmin && getAdminCompletedAssignments(task).length),
+                    'bg-danger': getVisibleStatus(task) === 'cancelled',
                   }"
                 >
-                  {{ formatStatus(task.status) }}
+                {{ !authStore.isAdmin ? formatStatus(getVisibleStatus(task)) : (getAdminCompletedAssignments(task).length ? "Completed" : formatStatus(getVisibleStatus(task))) }}
                 </span>
 
-                <!-- All users can change status -->
-                <select
-                  v-if="
-                    (canChangeStatus(task) &&
-                      task.status !== 'completed' &&
-                      task.status !== 'created') ||
-                    authStore.isAdmin
-                  "
-                  v-model="task.status"
-                  @change="updateStatus(task.id, task.status, task)"
-                  class="form-select form-select-sm mt-1"
-                  style="max-width: 150px"
-                >
-                  <template v-if="authStore.isAdmin">
-                    <option value="created">Created</option>
-                    <option value="assigned">Assigned</option>
+                <template v-if="authStore.isAdmin && getAdminCompletedAssignments(task).length">
+      <span
+        v-for="(text, index) in getAdminCompletedAssignments(task)"
+        :key="index"
+        class="badge bg-success"
+      >
+        {{ text }}
+      </span>
+    </template>
+                
+                <div v-if="!authStore.isAdmin">
+                  <select
+                    v-if="getVisibleStatus(task) !== 'completed' && getVisibleStatus(task) !== 'created' && getVisibleStatus(task) !== 'cancelled'"
+                    class="form-select form-select-sm mt-2"
+                    :value="getVisibleStatus(task)"
+                    @change="updateUserStatus(task, $event.target.value)"
+                  >
                     <option value="progress">In Progress</option>
                     <option value="hold">On Hold</option>
                     <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </template>
-                  <template v-else>
-                    <option value="progress">In Progress</option>
-                    <option value="hold">On Hold</option>
-                    <option value="completed">Completed</option>
-                  </template>
-                </select>
+                  </select>
+                </div>
               </td>
 
               <td v-if="!authStore.isAdmin">
-                <div v-if="task.assigned_users?.length">
-                  <div v-for="user in task.assigned_users" :key="user.id">
-                    {{ user.assignee_user?.name || user.name }} -
-                    {{ formatDate(user.assigned_at) }}
-                  </div>
-                </div>
-                <div v-else>Not assigned</div>
+                  <span
+                    v-if="getUserAssignment(task) && getVisibleStatus(task) !== 'created'"
+                  >
+                    <small class="text-muted">
+                      {{ formatDate(getUserAssignment(task).updated_at) }}
+                    </small>
+                  </span>
               </td>
 
               <td class="text-center align-middle">

@@ -72,6 +72,8 @@ Route::group(['prefix' => 'v1'], function () {
     Route::middleware('auth:sanctum')->group(function (){
         Route::get('tasks/{task}/assignments', [TaskAssignController::class, 'list']);
         Route::get('tasks/{task}/assignments/current', [TaskAssignController::class, 'current']);
+
+        Route::patch('tasks/{taskId}/assignments/{assignmentId}/update-task-status', [TaskAssignController::class, 'updateTaskStatus']);
     });
 
 // Admin-only

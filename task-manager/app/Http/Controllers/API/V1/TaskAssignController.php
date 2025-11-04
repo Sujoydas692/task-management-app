@@ -8,6 +8,7 @@ use App\Models\Group;
 use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -16,28 +17,29 @@ class TaskAssignController extends Controller
     public function list(Request $request, Task $task)
     {
         $perPage = min(100, (int) $request->get('per_page', 20));
-        $assignments = TaskAssignment::where('task_id', $task->id)
-            ->with([
-                'assignedBy:id,name,email',
-                'assigneeGroup:id,name',
-                'assigneeUser:id,name',
-            ])
+        $assignments = TaskAssignment::with([
+            'task:id,title,status',
+            'assignedBy:id,name',
+            'assigneeUser:id,name,email',
+            'assigneeGroup:id,name'
+        ])
+            ->where('task_id', $task->id)
             ->latest()
             ->paginate($perPage);
 
-        // Transform each assignment to include readable assignee name
-        $assignments->getCollection()->transform(function ($assignment) {
-            if ($assignment->assignee_type === 'group') {
-                $assignment->assignee_name = optional($assignment->assigneeGroup)->name;
-            } elseif ($assignment->assignee_type === 'user') {
-                $assignment->assignee_name = optional($assignment->assigneeUser)->name;
-            } else {
-                $assignment->assignee_name = 'N/A';
-            }
-            return $assignment;
+        $assignments->getCollection()->transform(function ($a) {
+            return [
+                'id' => $a->id,
+                'task_id' => $a->task_id,
+                'assignee_type' => $a->assignee_type,
+                'assignee_name' => $a->assigneeUser->name ?? $a->assigneeGroup->name ?? 'N/A',
+                'assigned_by' => $a->assignedBy,
+                'assigned_at' => $a->assigned_at,
+                'status' => $a->status ?? 'created',
+            ];
         });
 
-        return $this->success($assignments, 'Group users');
+        return $this->success($assignments, 'Task assignments with status');
     }
 
     public function store(TaskAssignStoreRequest $request, Task $task)
@@ -53,15 +55,10 @@ class TaskAssignController extends Controller
                 Group::findOrFail($validated['assignee_id']);
             }
 
-            $exists = TaskAssignment::where('task_id', $task->id)
+            TaskAssignment::where('task_id', $task->id)
                 ->where('assignee_type', $validated['assignee_type'])
                 ->where('assignee_id', $validated['assignee_id'])
                 ->exists();
-
-            if ($exists) {
-                return $this->error('Already assigned to this user or group.', 400);
-            }
-
 
             $taskAssignment = TaskAssignment::create([
                 'task_id' => $task->id,
@@ -69,9 +66,10 @@ class TaskAssignController extends Controller
                 'assignee_id' => $validated['assignee_id'],
                 'assigned_by' => $request->user()->id,
                 'assigned_at' => now(),
+                'status' => 'created'
             ]);
 
-            return $this->success($taskAssignment, 'Store Successful');
+            return $this->success($taskAssignment->load(['assigneeUser:id,name', 'assigneeGroup:id,name']), 'Assignment stored successfully');
 
 
         } catch (\Exception $exception){
@@ -95,5 +93,67 @@ class TaskAssignController extends Controller
             return $this->error();
         }
     }
+
+    public function updateTaskStatus(Request $request, $taskId, $assignmentId): JsonResponse
+    {
+        $user = $request->user();
+        $isAdmin = $user->type === 'Admin';
+
+        if ($isAdmin) {
+            $request->validate([
+                'status' => 'required|in:created,assigned,progress,hold,completed,cancelled',
+            ]);
+        } else {
+            $request->validate([
+                'status' => 'required|in:progress,hold,completed',
+            ]);
+        }
+
+        $assignment = TaskAssignment::where('task_id', $taskId)
+            ->where('id', $assignmentId)
+            ->first();
+
+        if (!$assignment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assignment not found for this task',
+            ]);
+        }
+
+        if ($isAdmin) {
+            $assignment->update(['status' => $request->status, 'updated_at' => now(),]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Admin updated assignment & task status successfully',
+                'data' => $assignment->load('task'),
+            ]);
+        } else {
+            $isAssignedToUser = (
+                ($assignment->assignee_type === 'user' && $assignment->assignee_id === $user->id)
+                ||
+                ($assignment->assignee_type === 'group' && $assignment->assigneeGroup?->users->contains($user->id))
+            );
+
+            if (!$isAssignedToUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You are not allowed to update this task status',
+                ]);
+            }
+
+            $assignment->update(['status' => $request->status, 'updated_at' => now(),]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User updated assignment status successfully',
+                'data' => $assignment->fresh(),
+            ]);
+        }
+    }
+
+
+
+
 
 }

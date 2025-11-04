@@ -68,18 +68,12 @@ onMounted(() => {
       <i class="bi bi-pencil-square side-bar-item-icon"></i>
       <span>Tasks</span>
     </RouterLink>
+    <div v-if="authStore.isAdmin">
     <RouterLink :to="{ name: 'groups' }" class="side-bar-item mt-2" active-class="active-link">
       <i class="bi bi-pencil-square side-bar-item-icon"></i>
       <span>Groups</span>
     </RouterLink>
-    <a href="/Completed" class="side-bar-item mt-2" active-class="active-link">
-      <i class="bi bi-check-circle side-bar-item-icon"></i>
-      <span>Completed</span>
-    </a>
-    <a href="/Canceled" class="side-bar-item mt-2" active-class="active-link">
-      <i class="bi bi-x-octagon side-bar-item-icon"></i>
-      <span>Canceled</span>
-    </a>
+    </div>
   </div>
 
   <RouterView/>

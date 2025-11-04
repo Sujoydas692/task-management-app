@@ -11,14 +11,14 @@ class Task extends Model
 {
     use SoftDeletes;
 
-    public const STATUSES = [
-        'created',
-        'assigned',
-        'progress',
-        'hold',
-        'completed',
-        'cancelled',
-    ];
+//    public const STATUSES = [
+//        'created',
+//        'assigned',
+//        'progress',
+//        'hold',
+//        'completed',
+//        'cancelled',
+//    ];
 
     protected $fillable = [
         'created_by',
