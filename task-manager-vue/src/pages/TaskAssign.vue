@@ -92,6 +92,7 @@ const assignTask = async () => {
   const payload = {
     assignee_type: chosenUser ? "user" : "group",
     assignee_id: chosenUser || chosenGroup,
+    status: "assigned",
   };
 
   const success = await store.assignTask(selectedTask.value, payload);

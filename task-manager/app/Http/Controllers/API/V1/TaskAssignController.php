@@ -66,7 +66,7 @@ class TaskAssignController extends Controller
                 'assignee_id' => $validated['assignee_id'],
                 'assigned_by' => $request->user()->id,
                 'assigned_at' => now(),
-                'status' => 'created'
+                'status' => $request->input('status', 'assigned')
             ]);
 
             return $this->success($taskAssignment->load(['assigneeUser:id,name', 'assigneeGroup:id,name']), 'Assignment stored successfully');
