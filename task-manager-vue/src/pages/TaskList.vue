@@ -327,14 +327,14 @@ window.addEventListener("storage", async (event) => {
                 </span>
 
                 <template v-if="authStore.isAdmin && getAdminCompletedAssignments(task).length">
-      <span
-        v-for="(text, index) in getAdminCompletedAssignments(task)"
-        :key="index"
-        class="badge bg-success"
-      >
-        {{ text }}
-      </span>
-    </template>
+                  <span
+                    v-for="(text, index) in getAdminCompletedAssignments(task)"
+                    :key="index"
+                    class="badge bg-success"
+                  >
+                    {{ text }}
+                  </span>
+                </template>
                 
                 <div v-if="!authStore.isAdmin">
                   <select
