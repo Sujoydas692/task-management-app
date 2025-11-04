@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, computed } from "vue";
+import { ref, onMounted, watch, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { createPinia, setActivePinia } from "pinia";
 import { useTaskAssignStore } from "../stores/taskAssignStore";
@@ -25,6 +25,8 @@ const taskName = ref("");
 const selectedGroup = ref("");
 const selectedUser = ref("");
 const selectedAvailableUser = ref("");
+
+const isAssignDisabled = ref(true);
 
 const availableUsers = ref([]);
 
@@ -106,7 +108,7 @@ const assignTask = async () => {
 const fetchAvailableUsers = async () => {
   try {
     const all = await store.getAllUsers();
-    
+
     const authUserId = Number(auth.user?.id);
 
     const groupUsers = groups.value.flatMap((g) => g.users || []);
@@ -123,7 +125,6 @@ const fetchAvailableUsers = async () => {
     availableUsers.value = [];
   }
 };
-
 
 // Delete assignment
 const removeAssignment = async (assignmentId) => {
@@ -174,10 +175,32 @@ const changeTaskStatus = async (assignment) => {
   }
 };
 
-watch(selectedGroup, () => {
-  selectedUser.value = "";
-  users.value = [];
-  loadGroupUsers();
+const updateAssignButtonState = () => {
+  if (selectedGroup.value && users.value.length === 0) {
+    isAssignDisabled.value = true;
+  } else {
+    isAssignDisabled.value = !(selectedAvailableUser.value || selectedGroup.value);
+  }
+};
+
+watch(selectedAvailableUser, async (newVal, oldVal) => {
+  if (newVal) {
+    selectedGroup.value = "";
+  }
+  await nextTick();
+  updateAssignButtonState();
+});
+
+watch(selectedGroup, async (newVal) => {
+  if (newVal) {
+    selectedAvailableUser.value = "";
+    selectedUser.value = "";
+    await loadGroupUsers();
+  } else {
+    users.value = [];
+  }
+  await nextTick();
+  updateAssignButtonState();
 });
 </script>
 
@@ -210,19 +233,23 @@ watch(selectedGroup, () => {
             </select>
           </div>
 
-          <!-- Select User -->
-          <div class="col-md-4">
-            <label class="form-label">Select User (From Group)</label>
-            <select
-              v-model="selectedUser"
-              class="form-select"
-              :disabled="!users.length"
-            >
-              <option value="">-- Entire Group --</option>
-              <option v-for="user in users" :key="user.id" :value="user.id">
+          <!-- Select User (From Group) -->
+          <div class="col-md-4" v-if="selectedGroup">
+            <label class="form-label">Group Members</label>
+
+            <div v-if="!users.length" class="text-muted small mt-1">
+              No members found for this group
+            </div>
+
+            <div v-else class="d-flex flex-wrap gap-2 mt-2">
+              <span
+                v-for="user in users"
+                :key="user.id"
+                class="badge bg-primary"
+              >
                 {{ user.name }}
-              </option>
-            </select>
+              </span>
+            </div>
           </div>
 
           <!-- Available Users (No Group) -->
@@ -245,7 +272,7 @@ watch(selectedGroup, () => {
           <button
             @click="assignTask"
             class="btn btn-primary"
-            :disabled="!selectedGroup && !selectedAvailableUser"
+            :disabled="isAssignDisabled"
           >
             Assign Task
           </button>
